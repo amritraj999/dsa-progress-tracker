@@ -8,6 +8,8 @@ A responsive, static DSA practice tracker built with **HTML, CSS, and vanilla Ja
 - Search and filter by topic, difficulty, and status
 - Direct LeetCode links open in a new tab
 - Click a status control to cycle through Not started → Attempted → Solved
+- "Did you solve it?" prompt when you return from a problem you opened
+- LeetCode sync: connect your username to auto-mark recently accepted problems as solved
 - Topic-wise completion analytics
 - Revision queue and per-problem notes
 - Automatic LocalStorage persistence
@@ -27,6 +29,24 @@ python3 -m http.server 8000
 ```
 
 Then open `http://localhost:8000`.
+
+## LeetCode sync
+
+Click **Connect LeetCode** in the sidebar and enter your username. AlgoTrack reads your
+**last 20 accepted submissions** (all LeetCode shares publicly) and marks matching problems
+as solved. It syncs when the app opens and whenever you return to its tab.
+Your LeetCode profile must be public, and older solves still need to be marked by hand.
+
+Browsers can't call LeetCode's API directly, so syncing goes through a small proxy.
+Out of the box the app uses the shared public `alfa-leetcode-api` instance, which is rate-limited.
+For reliable syncing, deploy your own free proxy from `worker/leetcode-sync.js`:
+
+1. Create a free Cloudflare account, then go to **Workers & Pages → Create → Worker**.
+2. Replace the starter code with the contents of `worker/leetcode-sync.js` and deploy.
+3. Copy the worker URL (for example `https://leetcode-sync.your-name.workers.dev`).
+4. In `app.js`, set `LEETCODE_SYNC_URL` to that URL.
+
+Or with the Wrangler CLI: `npx wrangler deploy worker/leetcode-sync.js --name leetcode-sync`.
 
 ## Push to GitHub
 

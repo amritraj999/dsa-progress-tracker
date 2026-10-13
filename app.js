@@ -430,16 +430,42 @@ const PROBLEMS = [
     topic,
     difficulty,
     platform,
+    slug: platform === "leetcode" ? ref : null,
     url: platform === "leetcode"
         ? `https://leetcode.com/problems/${ref}/`
         : ref
 }));
 
 const STORAGE_KEY = "algotrack-progress-v1";
+const PENDING_PRACTICE_KEY = "algotrack-pending-practice";
+
+// Deploy worker/leetcode-sync.js and paste its URL here for reliable syncing.
+// The public instance below works out of the box but is shared and rate-limited.
+const LEETCODE_SYNC_URL = "https://alfa-leetcode-api.onrender.com";
+
+const MIN_PRACTICE_MS = 15 * 1000;
+const MAX_PRACTICE_MS = 12 * 60 * 60 * 1000;
+const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
+const SYNC_TIMEOUT_MS = 60 * 1000;
+
+const PROBLEMS_BY_URL = new Map(
+    PROBLEMS.map(problem => [problem.url, problem])
+);
+
+const PROBLEMS_BY_SLUG = new Map(
+    PROBLEMS
+        .filter(problem => problem.slug)
+        .map(problem => [problem.slug, problem])
+);
 
 const defaultState = () => ({
     items: {},
     notes: {},
+    leetcode: {
+        username: "",
+        lastSyncAt: null,
+        error: null
+    },
     updatedAt: null
 });
 
@@ -447,6 +473,7 @@ let state = loadState();
 let activeView = "overview";
 let notesProblemId = null;
 let toastTimer;
+let syncInFlight = false;
 
 
 /* ==========================================
@@ -457,9 +484,15 @@ function loadState() {
     try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
 
+        const base = defaultState();
+
         return {
-            ...defaultState(),
-            ...(saved || {})
+            ...base,
+            ...(saved || {}),
+            leetcode: {
+                ...base.leetcode,
+                ...(saved?.leetcode || {})
+            }
         };
     } catch (error) {
         return defaultState();
@@ -714,6 +747,7 @@ function updateDashboard() {
 
     renderTopicPreview();
     renderRecent();
+    renderSyncCard();
 
     if (activeView === "problems") renderProblems();
     if (activeView === "topics") renderTopics();
@@ -1230,6 +1264,271 @@ function openNotes(id) {
 
 
 /* ==========================================
+   "DID YOU SOLVE IT?" PROMPT
+   Remembers the problem the user opened and asks
+   about it when they come back to this tab.
+   ========================================== */
+
+function rememberPractice(problem) {
+    try {
+        localStorage.setItem(
+            PENDING_PRACTICE_KEY,
+            JSON.stringify({ id: problem.id, openedAt: Date.now() })
+        );
+    } catch (error) {
+        // Prompt is a convenience; ignore storage failures
+    }
+}
+
+function takePendingPractice() {
+    try {
+        const pending = JSON.parse(
+            localStorage.getItem(PENDING_PRACTICE_KEY)
+        );
+
+        if (!pending) return null;
+
+        const elapsed = Date.now() - pending.openedAt;
+
+        // Came straight back: probably didn't solve it yet, ask next time
+        if (elapsed < MIN_PRACTICE_MS) return null;
+
+        localStorage.removeItem(PENDING_PRACTICE_KEY);
+
+        return elapsed > MAX_PRACTICE_MS ? null : pending;
+    } catch (error) {
+        return null;
+    }
+}
+
+function checkPendingPractice() {
+    const dialog = document.getElementById("practiceDialog");
+
+    if (dialog.open) return;
+
+    const pending = takePendingPractice();
+
+    if (!pending) return;
+
+    const problem = PROBLEMS.find(item => item.id === pending.id);
+
+    if (!problem || getItem(problem.id).status === "solved") return;
+
+    dialog.dataset.problemId = problem.id;
+    dialog.returnValue = "";
+
+    document.getElementById("practiceProblem").textContent =
+        problem.title;
+
+    dialog.showModal();
+}
+
+
+/* ==========================================
+   LEETCODE SYNC
+   Reads the user's recent accepted submissions
+   (LeetCode exposes the last 20 publicly) and marks
+   matching problems as solved.
+   ========================================== */
+
+function relativeTime(isoDate) {
+    const minutes = Math.round(
+        (Date.now() - new Date(isoDate)) / 60000
+    );
+
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
+
+    return `${Math.round(minutes / 1440)}d ago`;
+}
+
+function renderSyncCard() {
+    const { username, lastSyncAt, error } = state.leetcode;
+
+    const status = document.getElementById("syncStatus");
+    const syncButton = document.getElementById("syncNowBtn");
+
+    document.getElementById("syncSettingsBtn").hidden = !username;
+    syncButton.disabled = syncInFlight;
+
+    if (!username) {
+        status.textContent = "Auto-mark problems you solve";
+        syncButton.textContent = "Connect LeetCode";
+        return;
+    }
+
+    syncButton.textContent = syncInFlight ? "Syncing…" : "Sync now";
+
+    if (syncInFlight) {
+        status.textContent = `@${username} · syncing…`;
+    } else if (error) {
+        status.textContent = `@${username} · last sync failed`;
+    } else if (lastSyncAt) {
+        status.textContent = `@${username} · synced ${relativeTime(lastSyncAt)}`;
+    } else {
+        status.textContent = `@${username} · not synced yet`;
+    }
+}
+
+async function fetchAcceptedSubmissions(username) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SYNC_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(
+            `${LEETCODE_SYNC_URL}/${encodeURIComponent(username)}/acSubmission?limit=20`,
+            { signal: controller.signal }
+        );
+
+        if (response.status === 404) {
+            throw new Error(`LeetCode user "${username}" not found.`);
+        }
+
+        if (!response.ok) {
+            throw new Error("Sync service is busy. Try again in a few minutes.");
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data.submission)) {
+            throw new Error("Couldn't read submissions. Is the profile public?");
+        }
+
+        return data.submission;
+    } catch (error) {
+        if (error.name === "AbortError") {
+            throw new Error("Sync timed out. Try again in a minute.");
+        }
+
+        if (error instanceof TypeError) {
+            throw new Error("Couldn't reach the sync service.");
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function applyAcceptedSubmissions(submissions) {
+    const newlySolved = [];
+
+    submissions.forEach(submission => {
+        const problem = PROBLEMS_BY_SLUG.get(submission.titleSlug);
+
+        if (!problem) return;
+
+        const item = getItem(problem.id);
+        const solvedAt = new Date(
+            Number(submission.timestamp) * 1000
+        ).toISOString();
+
+        if (item.status === "solved") return;
+
+        // The user changed this problem by hand after that submission
+        if (item.updatedAt && item.updatedAt > solvedAt) return;
+
+        state.items[problem.id] = {
+            ...item,
+            status: "solved",
+            solvedAt,
+            updatedAt: new Date().toISOString()
+        };
+
+        newlySolved.push(problem);
+    });
+
+    return newlySolved;
+}
+
+async function syncLeetCode({ quiet = false } = {}) {
+    const username = state.leetcode.username;
+
+    if (!username || syncInFlight) return;
+
+    syncInFlight = true;
+    renderSyncCard();
+
+    if (!quiet) showToast(`Syncing @${username}…`);
+
+    try {
+        const submissions = await fetchAcceptedSubmissions(username);
+
+        // The user may have disconnected while the request was running
+        if (state.leetcode.username !== username) return;
+
+        const newlySolved = applyAcceptedSubmissions(submissions);
+
+        state.leetcode.lastSyncAt = new Date().toISOString();
+        state.leetcode.error = null;
+
+        if (newlySolved.length === 1) {
+            showToast(`Synced: ${newlySolved[0].title} marked solved.`);
+        } else if (newlySolved.length > 1) {
+            showToast(`Synced: ${newlySolved.length} problems marked solved.`);
+        } else if (!quiet) {
+            showToast("Synced. No new solves from this problem list.");
+        }
+    } catch (error) {
+        state.leetcode.error = error.message;
+
+        if (!quiet) showToast(error.message);
+    } finally {
+        syncInFlight = false;
+        saveState();
+    }
+}
+
+function autoSync() {
+    const { username, lastSyncAt } = state.leetcode;
+
+    if (!username) return;
+
+    if (
+        !lastSyncAt ||
+        Date.now() - new Date(lastSyncAt) > AUTO_SYNC_INTERVAL_MS
+    ) {
+        syncLeetCode({ quiet: true });
+    }
+}
+
+function openSyncSettings() {
+    const dialog = document.getElementById("syncDialog");
+
+    document.getElementById("leetcodeUsername").value =
+        state.leetcode.username;
+
+    document.getElementById("disconnectBtn").hidden =
+        !state.leetcode.username;
+
+    dialog.returnValue = "";
+    dialog.showModal();
+}
+
+function saveSyncSettings() {
+    const username = document
+        .getElementById("leetcodeUsername")
+        .value.trim()
+        .replace(/^@/, "");
+
+    if (!/^[\w.-]{1,40}$/.test(username)) {
+        showToast("Enter a valid LeetCode username.");
+        return;
+    }
+
+    state.leetcode = {
+        username,
+        lastSyncAt: null,
+        error: null
+    };
+
+    saveState();
+    syncLeetCode();
+}
+
+
+/* ==========================================
    EXPORT AND IMPORT
    ========================================== */
 
@@ -1313,7 +1612,11 @@ function resetProgress() {
 
     if (!confirmed) return;
 
-    state = defaultState();
+    // Keep the LeetCode connection; only progress is reset
+    state = {
+        ...defaultState(),
+        leetcode: state.leetcode
+    };
 
     saveState();
     renderProblems();
@@ -1327,6 +1630,16 @@ function resetProgress() {
    ========================================== */
 
 document.addEventListener("click", event => {
+
+    // Opening a problem: ask about it when the user returns
+    const problemLink = event.target.closest("a[href]");
+    const practicedProblem = problemLink &&
+        PROBLEMS_BY_URL.get(problemLink.getAttribute("href"));
+
+    if (practicedProblem) {
+        rememberPractice(practicedProblem);
+        return;
+    }
 
     // Main navigation
     const viewButton = event.target.closest("[data-view]");
@@ -1537,6 +1850,82 @@ document.getElementById("saveNotesBtn")
 
 
 /* ==========================================
+   SOLVE PROMPT AND LEETCODE SYNC EVENTS
+   ========================================== */
+
+// Middle-click also opens problems in a new tab
+document.addEventListener("auxclick", event => {
+    if (event.button !== 1) return;
+
+    const link = event.target.closest("a[href]");
+    const problem = link && PROBLEMS_BY_URL.get(link.getAttribute("href"));
+
+    if (problem) rememberPractice(problem);
+});
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+
+    checkPendingPractice();
+    autoSync();
+});
+
+document.getElementById("practiceDialog")
+    .addEventListener("close", event => {
+
+        const dialog = event.target;
+        const status = dialog.returnValue;
+
+        if (status !== "solved" && status !== "attempted") return;
+
+        updateItem(Number(dialog.dataset.problemId), { status });
+
+        showToast(`Marked as ${statusLabel(status).toLowerCase()}.`);
+    });
+
+document.getElementById("syncNowBtn")
+    .addEventListener("click", () => {
+
+        if (state.leetcode.username) {
+            syncLeetCode();
+        } else {
+            openSyncSettings();
+        }
+    });
+
+document.getElementById("syncSettingsBtn")
+    .addEventListener("click", openSyncSettings);
+
+// Enter should save, not trigger the dialog's first (close) button
+document.getElementById("leetcodeUsername")
+    .addEventListener("keydown", event => {
+
+        if (event.key !== "Enter") return;
+
+        event.preventDefault();
+        document.getElementById("syncDialog").close("save");
+    });
+
+document.getElementById("syncDialog")
+    .addEventListener("close", event => {
+
+        const action = event.target.returnValue;
+
+        if (action === "save") {
+            saveSyncSettings();
+        }
+
+        if (action === "disconnect") {
+            state.leetcode = defaultState().leetcode;
+            saveState();
+            showToast("LeetCode disconnected.");
+        }
+    });
+
+setInterval(renderSyncCard, 60 * 1000);
+
+
+/* ==========================================
    INITIALIZE APPLICATION
    ========================================== */
 
@@ -1549,3 +1938,5 @@ document.getElementById("todayLabel").textContent =
 
 fillTopicFilter();
 updateDashboard();
+checkPendingPractice();
+autoSync();

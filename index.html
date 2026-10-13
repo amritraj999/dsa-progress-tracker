@@ -33,6 +33,14 @@
             <p>Consistency beats intensity.</p>
           </div>
         </div>
+        <div class="sync-card">
+          <div class="sync-top">
+            <span class="sync-icon">⟳</span>
+            <div class="sync-copy"><strong>LeetCode sync</strong><p id="syncStatus">Auto-mark problems you solve</p></div>
+            <button class="icon-button sync-edit" id="syncSettingsBtn" title="LeetCode sync settings" aria-label="LeetCode sync settings" hidden>✎</button>
+          </div>
+          <button class="sync-button" id="syncNowBtn">Connect LeetCode</button>
+        </div>
         <button class="nav-item" id="exportBtn"><span class="nav-icon">⇩</span> Export progress</button>
         <label class="nav-item import-label" for="importFile"><span class="nav-icon">⇧</span> Import progress</label>
         <input type="file" id="importFile" accept="application/json,.json" hidden />
@@ -132,6 +140,8 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog id="notesDialog" class="notes-dialog"><form method="dialog"><div class="dialog-header"><div><div class="eyebrow">YOUR LEARNING LOG</div><h2 id="notesTitle">Problem notes</h2></div><button class="icon-button" aria-label="Close notes">✕</button></div><label class="field-label" for="notesText">Approach, mistakes, or key insight</label><textarea id="notesText" rows="6" placeholder="What pattern did you use? What would you do differently next time?"></textarea><div class="dialog-footer"><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" id="saveNotesBtn" value="save">Save notes</button></div></form></dialog>
+  <dialog id="practiceDialog" class="notes-dialog practice-dialog"><form method="dialog"><div class="dialog-header"><div><div class="eyebrow">WELCOME BACK</div><h2>How did it go?</h2></div><button class="icon-button" value="skip" aria-label="Close">✕</button></div><p class="dialog-copy">Did you solve <strong id="practiceProblem">this problem</strong> on LeetCode?</p><div class="dialog-footer"><button class="secondary-button" value="skip">Not yet</button><button class="secondary-button" value="attempted">◷ Attempted</button><button class="primary-button" value="solved" autofocus>✓ Solved</button></div></form></dialog>
+  <dialog id="syncDialog" class="notes-dialog"><form method="dialog"><div class="dialog-header"><div><div class="eyebrow">LEETCODE SYNC</div><h2>Connect your LeetCode</h2></div><button class="icon-button" value="cancel" aria-label="Close">✕</button></div><label class="field-label" for="leetcodeUsername">LeetCode username</label><input class="text-input" id="leetcodeUsername" type="text" placeholder="e.g. your_username" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="41"><p class="dialog-hint">AlgoTrack reads your <strong>last 20 accepted submissions</strong> from your public LeetCode profile and marks matching problems as solved. It syncs when you open the app or return to this tab. Older solves still need to be marked by hand.</p><div class="dialog-footer"><button class="secondary-button disconnect-button" id="disconnectBtn" value="disconnect" hidden>Disconnect</button><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" value="save">Save &amp; sync</button></div></form></dialog>
   <script src="app.js"></script>
 </body>
 </html>
