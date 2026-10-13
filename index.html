@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0e0e0e" />
+  <meta name="description" content="A personal DSA practice tracker with direct LeetCode links." />
+  <title>DSA Tracker — Practice with purpose</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#" aria-label="DSA Tracker home">
+        <span class="brand-mark">&lt;/&gt;</span>
+        <span>algo<span class="brand-light">track</span></span>
+      </a>
+      <div class="workspace-label">WORKSPACE</div>
+      <nav class="nav-list" aria-label="Main navigation">
+        <button class="nav-item active" data-view="overview"><span class="nav-icon">▦</span> Overview</button>
+        <button class="nav-item" data-view="problems"><span class="nav-icon">☷</span> Problem list <span class="nav-count" id="navTotal">400</span></button>
+        <button class="nav-item" data-view="topics"><span class="nav-icon">◈</span> Topic progress</button>
+        <button class="nav-item" data-view="revision"><span class="nav-icon">↻</span> Revision queue</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="daily-card">
+          <div class="daily-icon">✦</div>
+          <div>
+            <strong>One problem at a time.</strong>
+            <p>Consistency beats intensity.</p>
+          </div>
+        </div>
+        <button class="nav-item" id="exportBtn"><span class="nav-icon">⇩</span> Export progress</button>
+        <label class="nav-item import-label" for="importFile"><span class="nav-icon">⇧</span> Import progress</label>
+        <input type="file" id="importFile" accept="application/json,.json" hidden />
+        <div class="profile">
+          <div class="avatar">A</div>
+          <div class="profile-copy"><strong>My DSA journey</strong><span>Personal workspace</span></div>
+          <button class="icon-button" id="resetBtn" title="Reset all progress" aria-label="Reset all progress">•••</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="mobile-menu icon-button" id="menuBtn" aria-label="Toggle menu">☰</button>
+        <div class="breadcrumbs">Workspace <span>/</span> <strong id="breadcrumb">Overview</strong></div>
+        <div class="topbar-right"><span class="saved-indicator"><i></i> Saved locally</span><span class="date-label" id="todayLabel"></span></div>
+      </header>
+
+      <section class="view active-view" id="overviewView">
+        <div class="page-heading">
+          <div><div class="eyebrow">YOUR PRACTICE, AT A GLANCE</div><h1>Keep the momentum.</h1><p class="subtitle">Small wins compound. Pick a problem and keep moving forward.</p></div>
+          <button class="primary-button" id="continueBtn"><span>▶</span> Continue practice</button>
+        </div>
+
+        <div class="hero-panel">
+          <div class="hero-copy">
+            <div class="hero-tag"><span class="pulse-dot"></span> YOUR DSA ROADMAP</div>
+            <h2>Progress is built<br>one <em>problem</em> at a time.</h2>
+            <p>Track what you solve, spot the gaps, and revisit the problems that make you think.</p>
+            <button class="hero-button" data-goto="problems">Explore problem set <span>↗</span></button>
+          </div>
+          <div class="hero-visual" aria-hidden="true">
+            <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+            <div class="code-window"><div class="window-top"><span></span><span></span><span></span><small>solution.js</small></div>
+              <div class="code-lines"><p><b>01</b> <span class="code-purple">function</span> <span class="code-green">solve</span>(input) {</p><p><b>02</b> &nbsp; <span class="code-purple">const</span> answer = <span class="code-yellow">think</span>(input);</p><p><b>03</b> &nbsp; <span class="code-purple">return</span> answer;</p><p><b>04</b> }</p><p class="code-comment"><b>05</b> // keep showing up ✦</p></div>
+            </div>
+            <div class="floating-chip chip-top">✓ Solved today</div><div class="floating-chip chip-bottom">+1% better every day</div>
+          </div>
+        </div>
+
+        <div class="section-heading"><div><h2>Your progress</h2><p>Every solved problem moves you forward.</p></div><button class="text-button" data-goto="problems">View all problems <span>→</span></button></div>
+        <div class="stats-grid">
+          <article class="stat-card"><div class="stat-top"><span>Total problems</span><span class="stat-symbol neutral">▤</span></div><div class="stat-value" id="totalStat">400</div><div class="stat-foot"><span class="muted">In your current sheet</span></div></article>
+          <article class="stat-card"><div class="stat-top"><span>Solved</span><span class="stat-symbol green">✓</span></div><div class="stat-value" id="solvedStat">0</div><div class="stat-foot"><span class="positive" id="solvedPercent">0%</span><span class="muted">of all problems</span></div></article>
+          <article class="stat-card"><div class="stat-top"><span>In progress</span><span class="stat-symbol amber">◷</span></div><div class="stat-value" id="attemptedStat">0</div><div class="stat-foot"><span class="muted">Keep working at it</span></div></article>
+          <article class="stat-card"><div class="stat-top"><span>Need to start</span><span class="stat-symbol blue">↗</span></div><div class="stat-value" id="todoStat">400</div><div class="stat-foot"><span class="muted">Your next opportunities</span></div></article>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="content-card completion-card">
+            <div class="card-heading"><div><h3>Overall completion</h3><p>Your journey so far</p></div><span class="tiny-badge">ALL TOPICS</span></div>
+            <div class="completion-content"><div class="progress-ring" id="progressRing"><div><strong id="completionNumber">0%</strong><span>completed</span></div></div><div class="completion-legend"><div><i class="legend-dot solved-dot"></i><span>Solved</span><strong id="legendSolved">0</strong></div><div><i class="legend-dot attempted-dot"></i><span>Attempted</span><strong id="legendAttempted">0</strong></div><div><i class="legend-dot todo-dot"></i><span>Not started</span><strong id="legendTodo">400</strong></div></div></div>
+            <div class="card-divider"></div><div class="completion-note"><span class="note-icon">✦</span><span id="completionMessage">Start with one easy problem. Your progress will show up here.</span></div>
+          </section>
+          <section class="content-card topic-card">
+            <div class="card-heading"><div><h3>Topics to focus on</h3><p>Progress across key patterns</p></div><button class="icon-button" data-goto="topics" aria-label="View topics">↗</button></div>
+            <div id="topicPreview" class="topic-preview"></div>
+          </section>
+        </div>
+
+        <section class="content-card recent-card">
+          <div class="card-heading"><div><h3>Pick up where you left off</h3><p>Recently updated problems</p></div><button class="text-button" data-goto="problems">See problem list →</button></div>
+          <div id="recentProblems" class="recent-list"></div>
+        </section>
+      </section>
+
+      <section class="view" id="problemsView">
+        <div class="page-heading compact-heading"><div><div class="eyebrow">THE PRACTICE LIBRARY</div><h1>Problem list</h1><p class="subtitle">Choose a challenge, solve it on LeetCode, then update your progress here.</p></div><button class="secondary-button" id="clearFiltersBtn">Clear filters ↺</button></div>
+        <div class="problem-summary" id="problemSummary"></div>
+        <div class="filter-bar">
+          <label class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="Search problems or topics..." autocomplete="off"></label>
+          <select id="topicFilter" aria-label="Filter by topic"><option value="all">All topics</option></select>
+          <select id="difficultyFilter" aria-label="Filter by difficulty"><option value="all">All difficulties</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
+          <select id="statusFilter" aria-label="Filter by status"><option value="all">All statuses</option><option value="todo">Not started</option><option value="attempted">Attempted</option><option value="solved">Solved</option><option value="revision">Needs revision</option></select>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll"><table><thead><tr><th class="status-col">STATUS</th><th>PROBLEM</th><th>TOPIC</th><th>DIFFICULTY</th><th>REVISION</th><th class="action-col">PRACTICE</th></tr></thead><tbody id="problemTableBody"></tbody></table></div>
+          <div class="table-footer"><span id="tableCount">Showing 0 problems</span><span>Progress saves automatically in this browser.</span></div>
+        </div>
+        <div class="empty-state" id="emptyState" hidden><div>⌕</div><h3>No problems found</h3><p>Try changing your search or filters.</p></div>
+      </section>
+
+      <section class="view" id="topicsView">
+        <div class="page-heading compact-heading"><div><div class="eyebrow">KNOW YOUR PATTERNS</div><h1>Topic progress</h1><p class="subtitle">Build confidence topic by topic. Focus on the areas that need more reps.</p></div></div>
+        <div class="topic-overview-stats" id="topicStats"></div>
+        <div class="topic-grid" id="topicGrid"></div>
+      </section>
+
+      <section class="view" id="revisionView">
+        <div class="page-heading compact-heading"><div><div class="eyebrow">MAKE IT STICK</div><h1>Revision queue</h1><p class="subtitle">Flag solved problems you want to revisit. Repetition turns knowledge into recall.</p></div></div>
+        <div class="revision-tip"><span>↻</span><div><strong>Active recall tip</strong><p>Try solving again without looking at your old solution. If you get stuck, write down exactly where.</p></div></div>
+        <div class="table-card"><div class="table-scroll"><table><thead><tr><th>PROBLEM</th><th>TOPIC</th><th>DIFFICULTY</th><th>NOTES</th><th>ACTION</th></tr></thead><tbody id="revisionTableBody"></tbody></table></div></div>
+        <div class="empty-state" id="revisionEmpty"><div>✓</div><h3>Your revision queue is clear</h3><p>Use the revision toggle beside a problem to add it here.</p><button class="primary-button" data-goto="problems">Browse problems</button></div>
+      </section>
+      <footer class="app-footer"><span>Built for steady progress, not perfect streaks.</span><span><a href="https://leetcode.com/" target="_blank" rel="noopener noreferrer">LeetCode ↗</a> <i>·</i> <a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub ↗</a></span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="notesDialog" class="notes-dialog"><form method="dialog"><div class="dialog-header"><div><div class="eyebrow">YOUR LEARNING LOG</div><h2 id="notesTitle">Problem notes</h2></div><button class="icon-button" aria-label="Close notes">✕</button></div><label class="field-label" for="notesText">Approach, mistakes, or key insight</label><textarea id="notesText" rows="6" placeholder="What pattern did you use? What would you do differently next time?"></textarea><div class="dialog-footer"><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" id="saveNotesBtn" value="save">Save notes</button></div></form></dialog>
+  <script src="app.js"></script>
+</body>
+</html>
